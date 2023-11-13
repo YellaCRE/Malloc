@@ -281,6 +281,9 @@ void *mm_realloc(void *ptr, size_t size) {
     else {
         addSize = originalSize + GET_SIZE(HDRP(NEXT_BLKP(oldptr)));
         if (!GET_ALLOC(HDRP(NEXT_BLKP(oldptr))) && (newSize <= addSize)) {  // 뒤의 블록이 free이고 용량이 충분하면
+            splice_free_block(NEXT_BLKP(oldptr)); // 이 부분을 추가해주어야 한다!
+
+            size += GET_SIZE(HDRP(NEXT_BLKP(oldptr)));
             PUT(HDRP(oldptr), PACK(addSize, 1));
             PUT(FTRP(oldptr), PACK(addSize, 1));
             return oldptr;
