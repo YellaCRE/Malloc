@@ -190,7 +190,9 @@ void *mm_malloc(size_t size)
     place(bp, asize);
     return bp;
 }
-
+/*
+ * find_fit : first fit
+ */
 static void *find_fit(size_t asize) {
     void *bp;
 
@@ -220,8 +222,6 @@ static void place(void *bp, size_t asize) {
         PUT(FTRP(bp), PACK(csize, 1));
     }
 }
-
-
 
 /*
  * mm_realloc - Implemented simply in terms of mm_malloc and mm_free
