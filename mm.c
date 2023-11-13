@@ -76,7 +76,7 @@ static void *find_bestfit(size_t asize);
 static void place(void *bp, size_t asize);
 
 static char *heap_listp;
-static void *nextfit_bp;
+static char *next_fit_bp;
 
 /*
  * mm_init - initialize the malloc package.
@@ -93,7 +93,7 @@ int mm_init(void) {
     PUT(heap_listp + (3*WSIZE), PACK(0, 1));    //
     heap_listp += (2*WSIZE);    // 3번째 칸으로 이동
 
-    nextfit_bp = heap_listp;
+    next_fit_bp = heap_listp;
 
     if ( extend_heap(CHUNKSIZE/WSIZE) == NULL )
         return -1;
@@ -164,6 +164,9 @@ static void *coalesce(void *bp) {
         PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
         bp = PREV_BLKP(bp);
     }
+
+    // next_fit일 경우
+    next_fit_bp = bp;
     // printf("end coalesce \n");
     return bp;
 }
@@ -186,7 +189,12 @@ void *mm_malloc(size_t size)
     else
         asize = DSIZE * ((size + (DSIZE) + (DSIZE-1)) / DSIZE);
     
-    if ((bp = find_bestfit(asize)) != NULL) {
+    // 여기서 fit 종류 설정
+    // bp = find_fit(asize);
+    bp = find_nextfit(asize);
+    // bp = find_bestfit(asize);
+
+    if (bp != NULL) {
         place(bp, asize);
         return bp;
     }
@@ -216,14 +224,22 @@ static void *find_fit(size_t asize) {
  */
 
 static void *find_nextfit(size_t asize) {
-    void *bp;
+    char *bp;  // 여기가 first fit과 다르다! 타입이 char
 
-    for ( bp = nextfit_bp ; GET_SIZE(HDRP(bp)) > 0 ; bp = NEXT_BLKP(bp) ) {
+    for ( bp = NEXT_BLKP(next_fit_bp) ; GET_SIZE(HDRP(bp)) > 0 ; bp = NEXT_BLKP(bp) ) {
         if ( !GET_ALLOC(HDRP(bp)) && ( asize <= GET_SIZE(HDRP(bp)) ) ) {
-            nextfit_bp = bp;
+            next_fit_bp = bp;
             return bp;
         }
     }
+
+    for (bp = heap_listp; bp <= next_fit_bp; bp = NEXT_BLKP(bp)){
+        if ( !GET_ALLOC(HDRP(bp)) && ( asize <= GET_SIZE(HDRP(bp)) ) ) {
+            next_fit_bp = bp;
+            return bp;
+        }
+    }
+
     return NULL;
 }
 
@@ -233,18 +249,16 @@ static void *find_nextfit(size_t asize) {
 
 static void *find_bestfit(size_t asize) {
     void *bp;
-    void *best_bp = heap_listp;
+    void *best_bp = NULL;
 
     for ( bp = heap_listp ; GET_SIZE(HDRP(bp)) > 0 ; bp = NEXT_BLKP(bp) ) {
-        if (!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp))) && (GET_SIZE(HDRP(bp)) < GET_SIZE(HDRP(best_bp)))) {
-            best_bp = bp;
+        if (!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp)))) {
+            if (!best_bp ||(GET_SIZE(HDRP(bp)) < GET_SIZE(HDRP(best_bp))))  // best_bp가 없거나 갱신될 때 
+                best_bp = bp;
         }
     }
     
-    if (best_bp != heap_listp) {
-        return best_bp;
-    }
-    return NULL;
+    return best_bp;  // 기본 값을 NULL로 정의했기 때문에 못찾으면 NULL임
 }
 
 static void place(void *bp, size_t asize) {
@@ -271,18 +285,25 @@ static void place(void *bp, size_t asize) {
  */
 void *mm_realloc(void *ptr, size_t size) {
     // printf("start mm_realloc \n");
-    void *oldptr = ptr;
     void *newptr;
     size_t copySize;
 
+    if (ptr == NULL){
+        return mm_malloc(size);
+    }
+    if (size == 0){  // size == 0일 때
+        mm_free(ptr);
+        return NULL;
+    }
+
     newptr = mm_malloc(size);
-    if (newptr == NULL)
-      return NULL;
-    copySize = *(size_t *)((char *)oldptr - SIZE_T_SIZE);
-    if (size < copySize)    // 이미 할당된 메모리의 양을 줄일 때
-      copySize = size;
-    memcpy(newptr, oldptr, copySize);   // 메모리 복사 ( 덮어쓰기 느낌으로다가 )
-    mm_free(oldptr);    // oldptr이 뭘까? 아무튼 해제
+    copySize = GET_SIZE(HDRP(ptr)) - DSIZE;
+    if (size < copySize){    // 이미 할당된 메모리의 양을 줄일 때
+        copySize = size;
+    }
+
+    memcpy(newptr, ptr, copySize); // 메모리 복사 ( 덮어쓰기 느낌으로다가 )
+    mm_free(ptr);    // oldptr 해제
     // printf("end mm_realloc \n");
     return newptr;
 }
