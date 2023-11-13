@@ -68,10 +68,15 @@ team_t team = {
 
 static void *coalesce(void *bp);
 static void *extend_heap(size_t words);
+
 static void *find_fit(size_t asize);
+static void *find_nextfit(size_t asize);
+static void *find_bestfit(size_t asize);
+
 static void place(void *bp, size_t asize);
 
 static char *heap_listp;
+static void *nextfit_bp;
 
 /*
  * mm_init - initialize the malloc package.
@@ -87,6 +92,8 @@ int mm_init(void) {
     PUT(heap_listp + (2*WSIZE), PACK(DSIZE, 1));
     PUT(heap_listp + (3*WSIZE), PACK(0, 1));    //
     heap_listp += (2*WSIZE);    // 3번째 칸으로 이동
+
+    nextfit_bp = heap_listp;
 
     if ( extend_heap(CHUNKSIZE/WSIZE) == NULL )
         return -1;
@@ -179,7 +186,7 @@ void *mm_malloc(size_t size)
     else
         asize = DSIZE * ((size + (DSIZE) + (DSIZE-1)) / DSIZE);
     
-    if ((bp = find_fit(asize)) != NULL) {
+    if ((bp = find_bestfit(asize)) != NULL) {
         place(bp, asize);
         return bp;
     }
@@ -200,6 +207,42 @@ static void *find_fit(size_t asize) {
         if ( !GET_ALLOC(HDRP(bp)) && ( asize <= GET_SIZE(HDRP(bp)) ) ) {
             return bp;
         }
+    }
+    return NULL;
+}
+
+/*
+ * find_nextfit : next fit
+ */
+
+static void *find_nextfit(size_t asize) {
+    void *bp;
+
+    for ( bp = nextfit_bp ; GET_SIZE(HDRP(bp)) > 0 ; bp = NEXT_BLKP(bp) ) {
+        if ( !GET_ALLOC(HDRP(bp)) && ( asize <= GET_SIZE(HDRP(bp)) ) ) {
+            nextfit_bp = bp;
+            return bp;
+        }
+    }
+    return NULL;
+}
+
+/*
+ * find_bestfit : best fit
+ */
+
+static void *find_bestfit(size_t asize) {
+    void *bp;
+    void *best_bp = heap_listp;
+
+    for ( bp = heap_listp ; GET_SIZE(HDRP(bp)) > 0 ; bp = NEXT_BLKP(bp) ) {
+        if (!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp))) && (GET_SIZE(HDRP(bp)) < GET_SIZE(HDRP(best_bp)))) {
+            best_bp = bp;
+        }
+    }
+    
+    if (best_bp != heap_listp) {
+        return best_bp;
     }
     return NULL;
 }
