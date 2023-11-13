@@ -1,3 +1,5 @@
+// 현재 최고 성능 88/100 (explicit + improved allocate)
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
