@@ -75,11 +75,11 @@ int mm_init(void) {
     if ( ((heap_listp) = mem_sbrk(4*WSIZE)) == (void *)-1 ) // mem_sbrk에 의해 에러가 발생하면 -1
         return -1;
 
-    PUT(heap_listp, 0); // size: 0 / free
-    PUT(heap_listp + (1*WSIZE), PACK(DSIZE, 1));    // DSIZE와 1을 PACK한 값을 다음 칸에 할당
-    PUT(heap_listp + (2*WSIZE), PACK(DSIZE, 1));
-    PUT(heap_listp + (3*WSIZE), PACK(0, 1));    //
-    heap_listp += (2*WSIZE);    // 3번째 칸으로 이동
+    PUT(heap_listp, 0);                             // 정렬 패딩
+    PUT(heap_listp + (1*WSIZE), PACK(DSIZE, 1));    // 프롤로그 Header
+    PUT(heap_listp + (2*WSIZE), PACK(DSIZE, 1));    // 프롤로그 Footer
+    PUT(heap_listp + (3*WSIZE), PACK(0, 1));        // 에필로그 Header
+    heap_listp += (2*WSIZE);                        // 첫 번째 bp로 이동
 
     next_fit_bp = heap_listp;
 
@@ -113,6 +113,9 @@ void mm_free(void *bp) {
     coalesce(bp);   // 할당이 끝난 블록들 즉시 연결
 }
 
+/*
+ * coalesce
+ */
 static void *coalesce(void *bp) {
     size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp)));
     size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
