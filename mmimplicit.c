@@ -83,7 +83,7 @@ int mm_init(void) {
 
     next_fit_bp = heap_listp;
 
-    if ( extend_heap(CHUNKSIZE/WSIZE) == NULL )
+    if ( extend_heap(CHUNKSIZE/WSIZE) == NULL )  // 힙 크기를 더이상 늘릴 수 없을 때, 최대 사이즈를 넘거나 incr가 음수
         return -1;
     return 0;
 }

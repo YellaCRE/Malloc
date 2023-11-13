@@ -13,7 +13,7 @@
  ********************************************************/
 team_t team = {
     /* Team name */
-    "jungle_malloc",
+    "malloc_explicit",
     /* First member's full name */
     "Joe Hwang",
     /* First member's email address */
@@ -114,9 +114,9 @@ static void *extend_heap(size_t words) {  // implicit와 동일
 }
 
 /*
- * mm_free - Freeing a block does nothing.
+ * mm_free - implicit와 동일
  */
-void mm_free(void *bp) {  // implicit와 동일
+void mm_free(void *bp) {  
     size_t size = GET_SIZE(HDRP(bp));
     PUT(HDRP(bp), PACK(size, 0));
     PUT(FTRP(bp), PACK(size, 0));
@@ -140,8 +140,7 @@ static void splice_free_block(void *bp) {
     }
 
     // 이전 블록의 SUCC을 다음 가용 블록으로 연결
-    GET_SUCC(GET_PRED(bp)) = GET_SUCC(bp);  
-    
+    GET_SUCC(GET_PRED(bp)) = GET_SUCC(bp);
     if (GET_SUCC(bp) != NULL) // 다음 가용 블록이 있을 경우만
         // 다음 블록의 PRED를 이전 블록으로 변경
         GET_PRED(GET_SUCC(bp)) = GET_PRED(bp);
