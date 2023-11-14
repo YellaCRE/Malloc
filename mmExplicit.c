@@ -26,17 +26,27 @@ team_t team = {
     ""
 };
 
+
+/* ================== 매서드 및 변수 PreDefine ==================== */
+static void *extend_heap(size_t words);
+static void *coalesce(void *bp);
+static void *find_fit(size_t asize);
+static void place(void *bp, size_t asize);
+
+static void add_free_block(void *bp);  // 가용 리스트에 추가하는 함수
+static void splice_free_block(void *bp);  // 가용 리스트에서 제거하는 함수
+
+static char *free_listp;  // heap_listp 대신 생성
+
+/* ========================= Macros ========================= */                               
+
 /* single word (4) or double word (8) alignment */
 #define ALIGNMENT 8 // 8 : double word(byte)
 
 /* rounds up to the nearest multiple of ALIGNMENT */
 #define ALIGN(size) (((size) + (ALIGNMENT-1)) & ~0x7)
-
-
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t))) 
 
-/* ========================= Macros ========================= */                               
-                                            
 #define WSIZE 4
 #define DSIZE 8
 #define CHUNKSIZE (1<<12)
@@ -59,19 +69,6 @@ team_t team = {
 
 #define GET_SUCC(bp) (*(void **)((char *)(bp) + WSIZE))  // 다음 가용 블록의 주소
 #define GET_PRED(bp) (*(void **)(bp))                    // 이전 가용 블록의 주소
-
-/* ================== 매서드 및 변수 PreDefine ==================== */
-static void *coalesce(void *bp);
-static void *extend_heap(size_t words);
-
-static void *find_fit(size_t asize);
-
-static void place(void *bp, size_t asize);
-
-static void add_free_block(void *bp);  // 가용 리스트에 추가하는 함수
-static void splice_free_block(void *bp);  // 가용 리스트에서 제거하는 함수
-
-static char *free_listp;  // heap_listp 대신 생성
 
 /* ========================= FUNCTION ========================= */
 /*
