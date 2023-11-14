@@ -34,7 +34,8 @@ team_t team = {
 
 
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t))) 
-                                            
+
+/* ========================= Macros ========================= */                               
                                             
 #define WSIZE 4
 #define DSIZE 8
@@ -59,7 +60,7 @@ team_t team = {
 #define GET_SUCC(bp) (*(void **)((char *)(bp) + WSIZE))  // 다음 가용 블록의 주소
 #define GET_PRED(bp) (*(void **)(bp))                    // 이전 가용 블록의 주소
 
-// 매서드 및 변수 선언
+/* ================== 매서드 및 변수 PreDefine ==================== */
 static void *coalesce(void *bp);
 static void *extend_heap(size_t words);
 
@@ -72,6 +73,7 @@ static void splice_free_block(void *bp);  // 가용 리스트에서 제거하는
 
 static char *free_listp;  // heap_listp 대신 생성
 
+/* ========================= FUNCTION ========================= */
 /*
  * mm_init - initialize the malloc package.
  */
