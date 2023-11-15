@@ -70,10 +70,10 @@ static char *heap_epilogue = 0;  /* 에필로그 헤더를 기억한다 */
 #define PREV_BLKP(bp) ((char *)(bp) - GET_SIZE((char *)(bp) - DSIZE))
 
 // 새로운 매크로!
-#define PRED_PTR(bp) ((char *)(bp))
-#define SUCC_PTR(bp) ((char *)(bp) + WSIZE)
-#define PRED(bp) (char *)(free_listp + GET(PRED_PTR(bp)))
-#define SUCC(bp) (char *)(free_listp + GET(SUCC_PTR(bp)))
+#define PRED_PTR(bp) ((char *)(bp))                        // 첫 번째 칸에 왼쪽 자식
+#define SUCC_PTR(bp) ((char *)(bp) + WSIZE)                // 두 번째 칸에 오른쪽 자식
+#define PRED(bp) (char *)(free_listp + GET(PRED_PTR(bp)))  // 절대 주소로 변경
+#define SUCC(bp) (char *)(free_listp + GET(SUCC_PTR(bp)))  // 절대 주소로 변경
 
 // 새로운 매크로! 내 앞 블록이 free인지 alloc인지 확인할 수 있는 태그
 #define GET_TAG(p) (GET(p) & 0x2)
@@ -94,10 +94,10 @@ static char *heap_epilogue = 0;  /* 에필로그 헤더를 기억한다 */
 #define BP_LEQ(bp, size) (!BP_GREATER(bp, size))
 
 // 새로운 매크로! 
-#define OFFSET(ptr) ((char *)(ptr)-free_listp)
+#define OFFSET(ptr) ((char *)(ptr)-free_listp)  // free_listp에 대한 상대주소 생성
 
-#define SET_PRED(self, ptr) PUT(PRED_PTR(self), OFFSET(ptr))
-#define SET_SUCC(self, ptr) PUT(SUCC_PTR(self), OFFSET(ptr))
+#define SET_PRED(self, ptr) PUT(PRED_PTR(self), OFFSET(ptr))  // 상대주소로 왼쪽 자식 설정
+#define SET_SUCC(self, ptr) PUT(SUCC_PTR(self), OFFSET(ptr))  // 상대주소로 오른쪽 자식 설정
 
 // 새로운 매크로! explicit free list를 간단하게 만든 것
 #define LINK(ptr1, ptr2)  \
@@ -121,15 +121,15 @@ static char *heap_epilogue = 0;  /* 에필로그 헤더를 기억한다 */
  ********************************************************/
 
 // 새로운 매크로! 이진 검색을 하기 위한 정의
-#define LCH(ptr) PRED(ptr)  // 자식 찾기
-#define RCH(ptr) SUCC(ptr)
+#define LCH(ptr) PRED(ptr)  // 왼쪽 자식의 절대 주소를 가져온다
+#define RCH(ptr) SUCC(ptr)  // 오른쪽 자식의 절대 주소를 가져온다
 
-#define PARENT_PTR(ptr) ((char *)(ptr) + (2 * WSIZE))            // 부모 포인터
-#define PARENT(ptr) (char *)(free_listp + GET(PARENT_PTR(ptr)))  // 부모 주소
+#define PARENT_PTR(ptr) ((char *)(ptr) + (2 * WSIZE))            // 부모 주소의 상대 주소 저장 위치(bp에서 세 번째 칸)
+#define PARENT(ptr) (char *)(free_listp + GET(PARENT_PTR(ptr)))  // 부모 주소의 절대 주소
 
-#define SET_LCH(self, ptr) SET_PRED(self, ptr)
-#define SET_RCH(self, ptr) SET_SUCC(self, ptr)
-#define SET_PARENT(self, ptr) PUT(PARENT_PTR(self), OFFSET(ptr))
+#define SET_LCH(self, ptr) SET_PRED(self, ptr)  // 왼쪽 자식의 상대 주소 설정
+#define SET_RCH(self, ptr) SET_SUCC(self, ptr)  // 오른쪽 자식의 상대 주소 설정
+#define SET_PARENT(self, ptr) PUT(PARENT_PTR(self), OFFSET(ptr)) // 부모 주소의 상대주소 설정
 
 char *NIL = 0; /* NIL 정의! */
 
@@ -213,7 +213,7 @@ static void tree_erase(char **root, char *ptr) {
   } 
   else {  // 자식이 둘 다 있으면
     char *y = RCH(ptr);
-    while (LCH(y) != NIL) y = LCH(y);
+    while (LCH(y) != NIL) y = LCH(y);  // SUCC 찾기
     
     if (PARENT(y) != ptr) {
       TRANSPLANT(root, y, RCH(y));
