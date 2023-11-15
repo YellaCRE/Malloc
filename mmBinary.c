@@ -50,8 +50,6 @@ static char *heap_epilogue = 0;  /* 에필로그 헤더를 기억한다 */
 #define DSIZE 8  // double word size (bytes)
 #define CHUNKSIZE (1 << 12)
 
-#define MINIMUM_TREE_BLOCK_SIZE (3 * DSIZE)
-
 #define MAX(x, y) ((x) > (y) ? (x) : (y))
 #define MIN(x, y) ((x) < (y) ? (x) : (y))
 
@@ -69,23 +67,17 @@ static char *heap_epilogue = 0;  /* 에필로그 헤더를 기억한다 */
 #define NEXT_BLKP(bp) ((char *)(bp) + GET_SIZE((char *)(bp) - WSIZE))
 #define PREV_BLKP(bp) ((char *)(bp) - GET_SIZE((char *)(bp) - DSIZE))
 
-// 새로운 매크로!
-#define PRED_PTR(bp) ((char *)(bp))                        // 첫 번째 칸에 왼쪽 자식 저장
-#define SUCC_PTR(bp) ((char *)(bp) + WSIZE)                // 두 번째 칸에 오른쪽 자식 저장
-#define PRED(bp) (char *)(free_listp + GET(PRED_PTR(bp)))  // PRED_PTR를 절대 주소로 변경
-#define SUCC(bp) (char *)(free_listp + GET(SUCC_PTR(bp)))  // SUCC_PTR를 절대 주소로 변경
-
 // 새로운 매크로! 내 앞 블록이 free인지 alloc인지 확인할 수 있는 태그
 #define GET_TAG(p) (GET(p) & 0x2)
 
 // 새로운 매크로! Set or clear allocation bit
 #define SET_ALLOC(p) PUT(p, (GET(p) | 0x1))   // GET_ALLOC은 읽기이고 SET_ALLOC은 쓰기이다
-#define CLR_ALLOC(p) PUT(p, (GET(p) & ~0x1))  // 0으로 초기화
+#define CLR_ALLOC(p) PUT(p, (GET(p) & ~0x1))  // free로 설정
 #define SET_TAG(p) PUT(p, (GET(p) | 0x2));    // 앞 블록이 alloc 상태이다
 #define CLR_TAG(p) PUT(p, (GET(p) & ~0x2));   // 앞 블록이 free 상태이다
 
 // 새로운 매크로! Set block's size
-#define SET_SIZE(p, size) PUT(p, (size | (GET(p) & 0x7))) // 0111과 and 연산 후 or연산이므로 alloc을 유지한채로 사이즈만 바꾸겠다는 의미
+#define SET_SIZE(p, size) PUT(p, (size | (GET(p) & 0x7))) // 0111과 and 연산 후 or연산이므로 -> alloc 상태는 유지하고 사이즈만 설정하겠다
 
 // 새로운 매크로! 
 #define BP_LESS(bp, size) (GET_SIZE(HDRP(bp)) < size)     // bp가 작으면 TRUE
@@ -94,10 +86,18 @@ static char *heap_epilogue = 0;  /* 에필로그 헤더를 기억한다 */
 #define BP_LEQ(bp, size) (!BP_GREATER(bp, size))
 
 // 새로운 매크로! 
-#define OFFSET(ptr) ((char *)(ptr)-free_listp)  // free_listp에 대한 상대주소 생성
+#define OFFSET(ptr) ((char *)(ptr)-free_listp)                   // free_listp에 대한 ptr의 상대주소 생성 -> 이를 통해 왼쪽, 오른쪽, 부모인지 구분 가능
 
-#define SET_PRED(self, ptr) PUT(PRED_PTR(self), OFFSET(ptr))  // 상대주소로 왼쪽 자식 설정
-#define SET_SUCC(self, ptr) PUT(SUCC_PTR(self), OFFSET(ptr))  // 상대주소로 오른쪽 자식 설정
+#define PRED_PTR(bp) ((char *)(bp))                              // 블럭의 첫 번째 칸이 왼쪽 자식 주소
+#define SUCC_PTR(bp) ((char *)(bp) + WSIZE)                      // 블럭의 두 번째 칸이 오른쪽 자식 주소
+#define PARENT_PTR(ptr) ((char *)(ptr) + (2 * WSIZE))            // 블럭의 세 번째 칸이 부모 주소
+
+#define PRED(bp) (char *)(free_listp + GET(PRED_PTR(bp)))        // PRED_PTR를 절대 주소로 변경
+#define SUCC(bp) (char *)(free_listp + GET(SUCC_PTR(bp)))        // SUCC_PTR를 절대 주소로 변경
+#define PARENT(ptr) (char *)(free_listp + GET(PARENT_PTR(ptr)))  // PARENT_PTR를 절대 주소로 변경
+
+#define SET_PRED(self, ptr) PUT(PRED_PTR(self), OFFSET(ptr))     // ptr의 상대주소를 왼쪽 자식으로 저장
+#define SET_SUCC(self, ptr) PUT(SUCC_PTR(self), OFFSET(ptr))     // ptr의 상대주소를 오른쪽 자식으로 저장
 
 /*********************************************************
  *        Doubly Linked List Definition Begin
@@ -125,16 +125,14 @@ static char *heap_epilogue = 0;  /* 에필로그 헤더를 기억한다 */
  ********************************************************/
 
 // 새로운 매크로! 이진 검색을 하기 위한 정의
+#define MINIMUM_TREE_BLOCK_SIZE (3 * DSIZE)
+
 #define LCH(ptr) PRED(ptr)  // 왼쪽 자식의 절대 주소를 가져온다
 #define RCH(ptr) SUCC(ptr)  // 오른쪽 자식의 절대 주소를 가져온다
 
-#define PARENT_PTR(ptr) ((char *)(ptr) + (2 * WSIZE))            // 부모 주소의 상대 주소 저장 위치(bp에서 세 번째 칸)
-#define PARENT(ptr) (char *)(free_listp + GET(PARENT_PTR(ptr)))  // 부모 주소의 절대 주소
-
-#define SET_LCH(self, ptr) SET_PRED(self, ptr)  // 왼쪽 자식의 상대 주소 설정
-#define SET_RCH(self, ptr) SET_SUCC(self, ptr)  // 오른쪽 자식의 상대 주소 설정
-#define SET_PARENT(self, ptr) PUT(PARENT_PTR(self), OFFSET(ptr)) // 부모 주소의 상대주소 설정 
-                                                                 // self의 부모주소 ptr로 이동해서 ptr의 상대 주소를 저장하겠다
+#define SET_LCH(self, ptr) SET_PRED(self, ptr)                   // 왼쪽 자식 저장
+#define SET_RCH(self, ptr) SET_SUCC(self, ptr)                   // 오른쪽 자식 저장
+#define SET_PARENT(self, ptr) PUT(PARENT_PTR(self), OFFSET(ptr)) // 부모 저장
 
 char *NIL = 0; /* NIL 정의! */
 
@@ -250,6 +248,7 @@ static char *tree_root = 0;
 #define SPLIT_BACK(asize, next_size) (asize < 96 || next_size < 48)  // 6워드(MINIMUM_TREE_BLOCK_SIZE)가 48이다
 
 /* ========================= FUNCTION ========================= */
+
 /*
  * mm_init - initialize the malloc package.
  */
@@ -263,8 +262,8 @@ int mm_init(void) {
   tree_root = NIL;
 
   PUT(heap_listp, 0);                            /* Alignment padding */
-  PUT(heap_listp + WSIZE, 0);                    // 여기가 특이하다!
-  PUT(heap_listp + (2 * WSIZE), 0);              // 패딩과 프롤로그 사이에 무언가 존재!
+  PUT(heap_listp + WSIZE, 0);                    // free list header
+  PUT(heap_listp + (2 * WSIZE), 0);              // 정렬요구사항을 맞춰주기 위해 패딩 1개 더 넣는다 -> 여기는 안쓴다
   PUT(heap_listp + (3 * WSIZE), PACK(DSIZE, 1)); /* Prologue header */
   PUT(heap_listp + (4 * WSIZE), PACK(DSIZE, 1)); /* Prologue footer */
   PUT(heap_listp + (5 * WSIZE), PACK(0, 3));     /* Epilogue header */
@@ -285,7 +284,7 @@ int mm_init(void) {
 
   return 0;
 }
-
+// size를 포함할 수 있고 정렬조건에 맞는 size를 반환(최소 사이즈는 4워드)
 static inline size_t size_in_need(size_t size) {
   return MAX(DSIZE * 2, (ALIGN(size) - size >= WSIZE) ? ALIGN(size)
                                                       : (ALIGN(size) + DSIZE));
@@ -300,10 +299,9 @@ static void *extend_heap(size_t words) {
     return NULL;
   }
   
-  // 헤더 설정이 다르다!
   /* Initialize free block header/footer and the epilogue header */
   SET_SIZE(HDRP(bp), size);  // alloc을 유지한 채로 사이즈만 변경
-  CLR_ALLOC(HDRP(bp));       // tag는 유지한 채로 alloc만 0으로 초기화
+  CLR_ALLOC(HDRP(bp));       // tag는 유지한 채로 free로 설정
 
   PUT(FTRP(bp), PACK(size, 0));         /* Free block footer */
   PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1)); /* New epilogue header */
@@ -323,7 +321,7 @@ void *mm_malloc_wrapped(size_t size, bool realloc) {
     return NULL;
   }
 
-  asize = size_in_need(size);  // 이것도 약간 다른데 거의 비슷하다
+  asize = size_in_need(size);  // 필요한만큼만 asize를 불러온다
 
   // asize가 MINIMUM_TREE_BLOCK_SIZE보다 작으면 free list에서 찾고
   if (asize < MINIMUM_TREE_BLOCK_SIZE && (bp = find_fit(asize)) != NULL) {
@@ -332,14 +330,14 @@ void *mm_malloc_wrapped(size_t size, bool realloc) {
 
   // asize가 MINIMUM_TREE_BLOCK_SIZE보다 크면 tree에서 찾는다
   if ((bp = tree_find(tree_root, asize)) != NIL) {
-    tree_erase(&tree_root, bp);       // 트리에서 bp를 삭제하고
+    tree_erase(&tree_root, bp);       // 트리에서 bp(적절한 free block)를 삭제하고
     return place(bp, asize, false);   // bp에 할당
   }
 
-  // 그리고 모두 못 찾으면 새로 확장
+  // 못 찾으면 새로 확장
   extendsize = MAX(asize, CHUNKSIZE);
-  if (!realloc && !GET_TAG(heap_epilogue)) {  // realloc이 False이고 heap_epilogue의 앞 블록이 없으면
-    extendsize -= GET_SIZE(heap_epilogue - WSIZE);
+  if (!realloc && !GET_TAG(heap_epilogue)) {  // realloc이 False이고 heap_epilogue의 앞 블록이 free이면
+    extendsize -= GET_SIZE(heap_epilogue - WSIZE); // heap_epilogue의 앞 블록의 사이즈만큼 줄여서 확장한다 -> 정말 필요한만큼만 할당하기 위함
   }
 
   if ((bp = extend_heap(extendsize / WSIZE)) == NULL) {
@@ -376,7 +374,7 @@ void *find_fit(size_t asize) {
  * block size.
  */
 void *place(void *bp, size_t asize, bool trivial_split) {
-  SET_ALLOC(HDRP(bp));                // bp를 free로 설정
+  SET_ALLOC(HDRP(bp));                // bp를 alloc으로 설정
   size_t csize = GET_SIZE(HDRP(bp));  // bp의 사이즈
 
   if (csize > asize && csize - asize >= 2 * DSIZE) {  // 여유공간이 4워드 이상이면 분할한다
@@ -391,7 +389,7 @@ void *place(void *bp, size_t asize, bool trivial_split) {
       PUT(HDRP(next), PACK(next_size, 0));
       PUT(FTRP(next), PACK(next_size, 0));
     } 
-    // next size가 6워드 이상이면 합쳐지지 않게 하기 위해서 free블록을 앞에 위치하게 한다
+    // next size가 6워드 이상이면 coalesce에서 뒷 블록과 합쳐지지 않게 하기 위해서(합쳐지면 너무 커진다) free블록을 앞에 위치하게 한다
     else {
       next = bp;
       SET_SIZE(HDRP(next), next_size);
@@ -402,12 +400,12 @@ void *place(void *bp, size_t asize, bool trivial_split) {
       SET_SIZE(HDRP(bp), asize);  // 그리고 뒤에다가 alloc block
     }
     SET_TAG(HDRP(NEXT_BLKP(bp)));  // bp에 태그 설정
-    next = coalesce(next);  // free된 여유공간은 연결처리, 반환된 next는 합쳐진 후 bp
+    next = coalesce(next);  // free된 여유공간은 연결처리, 반환된 next는 합쳐진 후 bp를 의미한다
 
-    // next free 설정 콤보
+    // next를 free로 설정하는 설정 콤보
     SET_TAG(HDRP(next));             // next 앞 블록인 bp가 alloc 상태임을 표시
     CLR_ALLOC(HDRP(next));           // next free 설정
-    CLR_TAG(HDRP(NEXT_BLKP(next)));  // next의 다음 블록 태그 수정
+    CLR_TAG(HDRP(NEXT_BLKP(next)));  // next의 뒷 블록 태그 수정
 
     if (BP_LESS(next, MINIMUM_TREE_BLOCK_SIZE)) {  // 다시 next의 크기가 6워드보다 작으면 free list
       INSERT(free_listp, next);  
@@ -417,7 +415,7 @@ void *place(void *bp, size_t asize, bool trivial_split) {
     }
   }  
 
-  SET_TAG(HDRP(NEXT_BLKP(bp)));     // next 앞 블록인 bp가 alloc 상태임을 표시(중복처리되지만 상관없다)
+  SET_TAG(HDRP(NEXT_BLKP(bp)));     // next 앞 블록인 bp가 alloc 상태임을 표시(중복처리이지만 상관없다)
   return bp;
 }
 
@@ -431,8 +429,6 @@ void mm_free(void *bp) {
   SET_SIZE(HDRP(bp), size);
   CLR_ALLOC(HDRP(bp));
   CLR_TAG(HDRP(NEXT_BLKP(bp)));
-
-  // 풋터에도 설정
   PUT(FTRP(bp), PACK(size, 0));
   bp = coalesce(bp);
   
@@ -448,11 +444,11 @@ static void *coalesce(void *bp) {
   size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
   size_t size = GET_SIZE(HDRP(bp));
 
-  if (prev_alloc && next_alloc) { // 앞 뒤 블록이 모두 할당되어 있으면
+  if (prev_alloc && next_alloc) { // 앞 뒤 블록이 모두 alloc이면
     return bp;
   } 
 
-  else if (prev_alloc && !next_alloc) { // 앞의 블록만 할당되어 있을 때
+  else if (prev_alloc && !next_alloc) { // 뒤의 블록만 free일 때
     ERASE_FROM_TREE_OR_LIST(&tree_root, NEXT_BLKP(bp));  // splice_free_block와 같은 역할인 것 같다
 
     size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
@@ -460,7 +456,7 @@ static void *coalesce(void *bp) {
     PUT(FTRP(bp), PACK(size, 0));
   } 
 
-  else if (!prev_alloc && next_alloc) { // 뒤의 블록만 할당되어 있을 때
+  else if (!prev_alloc && next_alloc) { // 앞의 블록만 free일 때
     ERASE_FROM_TREE_OR_LIST(&tree_root, PREV_BLKP(bp));  // splice_free_block
 
     size += GET_SIZE(HDRP(PREV_BLKP(bp)));
@@ -469,7 +465,7 @@ static void *coalesce(void *bp) {
     bp = PREV_BLKP(bp);
   } 
 
-  else { // 둘다 할당되지 않았을 때
+  else { // 둘 다 free일 때
     ERASE_FROM_TREE_OR_LIST(&tree_root, NEXT_BLKP(bp));  // splice_free_block
     ERASE_FROM_TREE_OR_LIST(&tree_root, PREV_BLKP(bp));
 
@@ -530,7 +526,9 @@ void *mm_realloc(void *ptr, size_t size) {
     SET_TAG(HDRP(NEXT_BLKP(bp))); \
   } while (0)
 
-  // 여기가 improved realloc을 구현한 부분이다.
+  /*
+  * improved realloc
+  */
   // originalSize로만 asize를 커버할 수 있으면
   if (originalSize >= asize) {
     TRIVAL_PLACE(ptr);
@@ -548,7 +546,7 @@ void *mm_realloc(void *ptr, size_t size) {
     TRIVAL_PLACE(ptr);
     return ptr;
   } 
-  // 앞 뒤 모두를 통합해서 커버할 수 있으면
+  // 앞 뒤 모두를 합쳐서 커버할 수 있으면
   else if (originalSize + next_available_size + prev_available_size >= asize) {
     COALESCE_NEXT;
     COALESCE_PREV;
@@ -574,7 +572,7 @@ void *mm_realloc(void *ptr, size_t size) {
       return NULL;
     }
 
-    originalSize += GET_SIZE(HDRP(bp)); // bp = NEXT_BLKP(ptr)이다
+    originalSize += GET_SIZE(HDRP(NEXT_BLKP(ptr))); // NEXT_BLKP(ptr) = bp이다
     SET_SIZE(HDRP(ptr), originalSize);
     SET_SIZE(FTRP(ptr), originalSize);
     SET_TAG(HDRP(NEXT_BLKP(ptr)));

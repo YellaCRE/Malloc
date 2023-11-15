@@ -36,7 +36,7 @@ static void place(void *bp, size_t asize);
 static void add_free_block(void *bp);  // 가용 리스트에 추가하는 함수
 static void splice_free_block(void *bp);  // 가용 리스트에서 제거하는 함수
 
-static char *free_listp;  // heap_listp 대신 생성
+static char *heap_listp;
 
 /* ========================= Macros ========================= */                               
 
@@ -76,22 +76,22 @@ static char *free_listp;  // heap_listp 대신 생성
  */
 int mm_init(void) {
     // 초기 힙 생성
-    if ((free_listp = mem_sbrk(8 * WSIZE)) == (void *)-1) // 8워드 크기의 힙 생성, free_listp에 힙의 시작 주소값 할당(가용 블록만 추적)
+    if ((heap_listp = mem_sbrk(8 * WSIZE)) == (void *)-1) // 8워드 크기의 힙 생성, heap_listp에 힙의 시작 주소값 할당(가용 블록만 추적)
         return -1;
     
-    PUT(free_listp, 0);                                // 정렬 패딩
-    PUT(free_listp + (1 * WSIZE), PACK(2 * WSIZE, 1)); // 프롤로그 Header
-    PUT(free_listp + (2 * WSIZE), PACK(2 * WSIZE, 1)); // 프롤로그 Footer
+    PUT(heap_listp, 0);                                // 정렬 패딩
+    PUT(heap_listp + (1 * WSIZE), PACK(2 * WSIZE, 1)); // 프롤로그 Header
+    PUT(heap_listp + (2 * WSIZE), PACK(2 * WSIZE, 1)); // 프롤로그 Footer
     
     // explicit에서 새로 추가되는 부분
-    PUT(free_listp + (3 * WSIZE), PACK(4 * WSIZE, 0)); // 첫 가용 블록의 헤더
-    PUT(free_listp + (4 * WSIZE), NULL);               // 이전 가용 블록의 주소
-    PUT(free_listp + (5 * WSIZE), NULL);               // 다음 가용 블록의 주소
-    PUT(free_listp + (6 * WSIZE), PACK(4 * WSIZE, 0)); // 첫 가용 블록의 푸터
+    PUT(heap_listp + (3 * WSIZE), PACK(4 * WSIZE, 0)); // 첫 가용 블록의 헤더
+    PUT(heap_listp + (4 * WSIZE), NULL);               // 이전 가용 블록의 주소
+    PUT(heap_listp + (5 * WSIZE), NULL);               // 다음 가용 블록의 주소
+    PUT(heap_listp + (6 * WSIZE), PACK(4 * WSIZE, 0)); // 첫 가용 블록의 푸터
     // 여기까지
 
-    PUT(free_listp + (7 * WSIZE), PACK(0, 1));         // 에필로그 Header: 프로그램이 할당한 마지막 블록의 뒤에 위치하며, 블록이 할당되지 않은 상태를 나타냄
-    free_listp += (4 * WSIZE);                         // 첫번째 가용 블록의 bp
+    PUT(heap_listp + (7 * WSIZE), PACK(0, 1));         // 에필로그 Header: 프로그램이 할당한 마지막 블록의 뒤에 위치하며, 블록이 할당되지 않은 상태를 나타냄
+    heap_listp += (4 * WSIZE);                         // 첫번째 가용 블록의 bp
 
     if (extend_heap(CHUNKSIZE / WSIZE) == NULL)
         return -1;
@@ -128,16 +128,16 @@ void mm_free(void *bp) {
 // LIFO를 쓸 때
 // 가용 리스트에 추가하는 함수
 static void add_free_block(void *bp) {
-    GET_SUCC(bp) = free_listp;     // bp의 SUCC은 루트가 가리키던 블록
-    if (free_listp != NULL)        // free list에 블록이 존재했을 경우만
-        GET_PRED(free_listp) = bp; // 루트였던 블록의 PRED를 추가된 블록으로 연결
-    free_listp = bp;               // 루트를 현재 블록으로 변경
+    GET_SUCC(bp) = heap_listp;     // bp의 SUCC은 루트가 가리키던 블록
+    if (heap_listp != NULL)        // free list에 블록이 존재했을 경우만
+        GET_PRED(heap_listp) = bp; // 루트였던 블록의 PRED를 추가된 블록으로 연결
+    heap_listp = bp;               // 루트를 현재 블록으로 변경
 }
 
 // 가용 리스트에서 제거하는 함수
 static void splice_free_block(void *bp) {
-    if (bp == free_listp){                 // 분리하려는 블록이 루트이면, case 1
-        free_listp = GET_SUCC(free_listp); // 다음 블록을 루트로 변경
+    if (bp == heap_listp){                 // 분리하려는 블록이 루트이면, case 1
+        heap_listp = GET_SUCC(heap_listp); // 다음 블록을 루트로 변경
         return;
     }
 
@@ -235,7 +235,7 @@ void *mm_malloc(size_t size) {  // implicit와 동일
 static void *find_fit(size_t asize) {
     void *bp;
 
-    for ( bp = free_listp ; bp != NULL ; bp = GET_SUCC(bp) ) {
+    for ( bp = heap_listp ; bp != NULL ; bp = GET_SUCC(bp) ) {
         if ( asize <= GET_SIZE(HDRP(bp)) ) {  // 할당 여부 체크 안해도 된다! explicit니까
             return bp;
         }
