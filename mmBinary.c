@@ -16,9 +16,9 @@ team_t team = {
     /* Team name */
     "malloc_Binary",
     /* First member's full name */
-    "coyorkdow",
+    "",
     /* First member's email address */
-    "coyorkdow@outlook.com",
+    "",
     /* Second member's full name (leave blank if none) */
     "",
     /* Second member's email address (leave blank if none) */
@@ -63,17 +63,17 @@ static char *heap_epilogue = 0;  /* 에필로그 헤더를 기억한다 */
 #define GET_SIZE(p) (GET(p) & ~0x7)
 #define GET_ALLOC(p) (GET(p) & 0x1)
 
-#define HDRP(bp) ((char *)(bp)-WSIZE)
+#define HDRP(bp) ((char *)(bp) - WSIZE)
 #define FTRP(bp) ((char *)(bp) + GET_SIZE(HDRP(bp)) - DSIZE)
 
 #define NEXT_BLKP(bp) ((char *)(bp) + GET_SIZE((char *)(bp) - WSIZE))
 #define PREV_BLKP(bp) ((char *)(bp) - GET_SIZE((char *)(bp) - DSIZE))
 
 // 새로운 매크로!
-#define PRED_PTR(bp) ((char *)(bp))                        // 첫 번째 칸에 왼쪽 자식
-#define SUCC_PTR(bp) ((char *)(bp) + WSIZE)                // 두 번째 칸에 오른쪽 자식
-#define PRED(bp) (char *)(free_listp + GET(PRED_PTR(bp)))  // 절대 주소로 변경
-#define SUCC(bp) (char *)(free_listp + GET(SUCC_PTR(bp)))  // 절대 주소로 변경
+#define PRED_PTR(bp) ((char *)(bp))                        // 첫 번째 칸에 왼쪽 자식 저장
+#define SUCC_PTR(bp) ((char *)(bp) + WSIZE)                // 두 번째 칸에 오른쪽 자식 저장
+#define PRED(bp) (char *)(free_listp + GET(PRED_PTR(bp)))  // PRED_PTR를 절대 주소로 변경
+#define SUCC(bp) (char *)(free_listp + GET(SUCC_PTR(bp)))  // SUCC_PTR를 절대 주소로 변경
 
 // 새로운 매크로! 내 앞 블록이 free인지 alloc인지 확인할 수 있는 태그
 #define GET_TAG(p) (GET(p) & 0x2)
@@ -98,6 +98,10 @@ static char *heap_epilogue = 0;  /* 에필로그 헤더를 기억한다 */
 
 #define SET_PRED(self, ptr) PUT(PRED_PTR(self), OFFSET(ptr))  // 상대주소로 왼쪽 자식 설정
 #define SET_SUCC(self, ptr) PUT(SUCC_PTR(self), OFFSET(ptr))  // 상대주소로 오른쪽 자식 설정
+
+/*********************************************************
+ *        Doubly Linked List Definition Begin
+ ********************************************************/
 
 // 새로운 매크로! explicit free list를 간단하게 만든 것
 #define LINK(ptr1, ptr2)  \
@@ -129,7 +133,8 @@ static char *heap_epilogue = 0;  /* 에필로그 헤더를 기억한다 */
 
 #define SET_LCH(self, ptr) SET_PRED(self, ptr)  // 왼쪽 자식의 상대 주소 설정
 #define SET_RCH(self, ptr) SET_SUCC(self, ptr)  // 오른쪽 자식의 상대 주소 설정
-#define SET_PARENT(self, ptr) PUT(PARENT_PTR(self), OFFSET(ptr)) // 부모 주소의 상대주소 설정
+#define SET_PARENT(self, ptr) PUT(PARENT_PTR(self), OFFSET(ptr)) // 부모 주소의 상대주소 설정 
+                                                                 // self의 부모주소 ptr로 이동해서 ptr의 상대 주소를 저장하겠다
 
 char *NIL = 0; /* NIL 정의! */
 
@@ -189,17 +194,17 @@ static void tree_insert(char **root, char *ptr) {
       x = LCH(x);
     }
   }
-  SET_PARENT(ptr, y);  // 제자리에 도착했으면 부모 설정
+  SET_PARENT(ptr, y);  // 제자리에 도착했으면 부모 설정 -> y를 ptr의 부모로 저장
 
   if (y == NIL) {  // 그런데 삽입노드 밖에 없다?
     *root = ptr;   // 루트로 설정
   } 
   // y를 기준으로 오른쪽 자식인지 왼쪽 자식인지 설정
   else if (GET_SIZE(HDRP(y)) < size) {  
-    SET_RCH(y, ptr);
+    SET_RCH(y, ptr);  // ptr의 상대주소를 y의 SUCC 저장 ptr에 저장
   } 
   else {
-    SET_LCH(y, ptr);
+    SET_LCH(y, ptr);  // ptr의 상대주소를 y의 PRED 저장 ptr에 저장
   }
 }
 
