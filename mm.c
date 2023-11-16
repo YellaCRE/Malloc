@@ -389,7 +389,7 @@ void *place(void *bp, size_t asize, bool trivial_split) {
       PUT(HDRP(next), PACK(next_size, 0));
       PUT(FTRP(next), PACK(next_size, 0));
     } 
-    // next size가 6워드 이상이면 앞 쪽 free block과 합쳐서 트리에 넣음으로써 외부 단편화를 해소할 수 있다
+    // next size가 6워드 이상이면 앞 쪽 free block과 합쳐서 트리에 넣음으로써 단편화를 해소할 수 있는 것 같다
     else {
       next = bp;
       SET_SIZE(HDRP(next), next_size);
